@@ -17,7 +17,7 @@
  * - Token validated, __Host-preview_session cookie set
  *
  * Endpoints:
- * - POST /_auth/preview/authorize  - Generate preview token (requires shield_session)
+ * - POST /_auth/preview/authorize  - Generate preview token (JWT or shield_session)
  * - POST /_auth/preview/validate   - Internal: validate preview token or session
  */
 
@@ -25,9 +25,12 @@ import crypto from 'crypto';
 import type { Hono } from 'hono';
 import { db } from '../database';
 import { parseCookies } from '../utils/cookie';
-import { validateSession } from '../auth/session';
-import { getDeviceFingerprint, getClientIp } from '../auth/fingerprint';
+import type { Session } from '../auth/session';
+import { getClientIp } from '../auth/fingerprint';
+import { verifyRequestPoP } from '../auth/pop';
 import { logAuditEvent } from '../services/audit.service';
+import { getCurrentTier } from '../services/tier.service';
+import { verifyJwtToken } from '../auth/jwt';
 
 const PREVIEW_TOKEN_TTL_MS = 60 * 1000; // 60 seconds — single-use, short-lived
 const PREVIEW_SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours — matches shield session
@@ -40,22 +43,52 @@ export function registerPreviewRoutes(app: Hono, hostname: string): void {
    * POST /_auth/preview/authorize
    *
    * Called by the dashboard (from console.ellul.ai → {id}-srv.ellul.ai, same-site).
-   * Validates shield_session cookie, returns a short-lived single-use preview token.
+   * Tier-aware: standard/ssh_only use JWT, web_locked uses shield_session.
+   * Returns a short-lived single-use preview token.
    */
   app.post('/_auth/preview/authorize', async (c) => {
-    const cookies = parseCookies(c.req.header('cookie'));
-    const sessionId = cookies.shield_session;
-
-    if (!sessionId) {
-      return c.json({ error: 'Authentication required' }, 401);
-    }
-
+    const tier = getCurrentTier();
     const ip = getClientIp(c);
-    const fingerprintData = getDeviceFingerprint(c);
-    const result = validateSession(sessionId, ip, fingerprintData, '/_auth/preview/authorize');
 
-    if (!result.valid) {
-      return c.json({ error: 'Session invalid' }, 401);
+    let sessionId: string;
+
+    if (tier === 'web_locked') {
+      // Web Locked: shield_session + PoP (matches terminal authorize)
+      const cookies = parseCookies(c.req.header('cookie'));
+      const shieldSession = cookies.shield_session;
+
+      if (!shieldSession) {
+        return c.json({ error: 'Authentication required' }, 401);
+      }
+
+      const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(shieldSession) as Session | undefined;
+      if (!session) {
+        return c.json({ error: 'Invalid session' }, 401);
+      }
+
+      // PoP is MANDATORY for web_locked — no exceptions
+      if (!session.pop_public_key) {
+        return c.json({
+          error: 'Session not fully initialized',
+          reason: 'pop_not_bound',
+          hint: 'PoP key binding in progress - retry in 1 second'
+        }, 401);
+      }
+
+      const popResult = await verifyRequestPoP(c, session);
+      if (!popResult.valid) {
+        return c.json({ error: 'PoP validation failed', reason: popResult.reason }, 401);
+      }
+
+      sessionId = shieldSession;
+    } else {
+      // Standard / SSH Only: JWT authentication
+      const jwtPayload = verifyJwtToken(c.req);
+      if (!jwtPayload) {
+        return c.json({ error: 'Authentication required' }, 401);
+      }
+
+      sessionId = 'jwt:' + (jwtPayload.jti || crypto.randomBytes(8).toString('hex'));
     }
 
     // Generate single-use preview token

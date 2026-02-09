@@ -198,6 +198,9 @@ async function handleMessage(type, data) {
     case 'get_terminal_token':
       return await fetchTokenWithPopRecovery('/_auth/terminal/authorize', 'terminal token');
 
+    case 'get_preview_token':
+      return await fetchTokenWithPopRecovery('/_auth/preview/authorize', 'preview token');
+
     case 'reauthenticate':
       // Force fresh passkey authentication and reinitialize PoP
       // Step 1: Clear the local PoP key from IndexedDB
