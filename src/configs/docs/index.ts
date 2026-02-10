@@ -119,7 +119,11 @@ This will build and deploy with auto-SSL.
 export function getGlobalClaudeMd(domain: string, tier?: string): string {
   // Convert main domain to dev domain on ellul.app (user content isolation)
   // {shortId}-srv.ellul.ai → {shortId}-dev.ellul.app
-  const devDomain = domain.replace("-srv.", "-dev.").replace("-dc.", "-ddev.").replace(/\.ellul\.ai$/, ".ellul.app");
+  // When domain is a placeholder (__DOMAIN__), use __DEV_DOMAIN__ so boot-config
+  // can replace server domain and dev domain independently via sed
+  const devDomain = domain === "__DOMAIN__"
+    ? "__DEV_DOMAIN__"
+    : domain.replace("-srv.", "-dev.").replace("-dc.", "-ddev.").replace(/\.ellul\.ai$/, ".ellul.app");
 
   if (tier === "starter") {
     return `# ellul.ai Sandbox: ${domain}

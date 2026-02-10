@@ -22,6 +22,7 @@ mkdir -p "$CONTEXT_DIR"
 
 generate_global() {
   DOMAIN=$(cat /etc/ellulai/domain 2>/dev/null || echo "YOUR-DOMAIN")
+  DEV_DOMAIN=$(cat /etc/ellulai/dev-domain 2>/dev/null || echo "dev.$DOMAIN")
 
   if [ "$TIER" = "free" ]; then
     generate_global_free
@@ -80,7 +81,7 @@ After deployment, \\\`ship\\\` adds: deployedUrl, deployedDomain, deployedPort
 Vite: \\\`server: { host: true, port: 3000, allowedHosts: true }\\\`
 Next.js: \\\`"dev": "next dev -H 0.0.0.0 -p 3000"\\\`
 Other: bind to 0.0.0.0:3000
-Preview URL: https://dev.$DOMAIN
+Preview URL: https://$DEV_DOMAIN
 
 ## STOP: Verification Required Before Completing
 You MUST run these commands and confirm they pass:
@@ -95,7 +96,7 @@ If verification fails, fix the issue:
 Do NOT report task complete until verification passes!
 
 ## Ports
-- Dev/Preview: 3000 (→ https://dev.$DOMAIN)
+- Dev/Preview: 3000 (→ https://$DEV_DOMAIN)
 - Production: 3001+ (→ https://APPNAME-$DOMAIN)
 - Reserved: 7681-7700
 
@@ -208,7 +209,7 @@ ALWAYS create a \\\`ellulai.json\\\` file in the project root:
 Vite: \\\`server: { host: true, port: 3000, allowedHosts: true }\\\`
 Next.js: \\\`"dev": "next dev -H 0.0.0.0 -p 3000"\\\`
 Other: bind to 0.0.0.0:3000
-Preview URL: https://dev.$DOMAIN
+Preview URL: https://$DEV_DOMAIN
 
 ## STOP: Verification Required Before Completing
 You MUST run these commands and confirm they pass:
@@ -223,7 +224,7 @@ If verification fails, fix the issue:
 Do NOT report task complete until verification passes!
 
 ## Ports
-- Dev/Preview: 3000 (→ https://dev.$DOMAIN)
+- Dev/Preview: 3000 (→ https://$DEV_DOMAIN)
 - Reserved: 7681-7700
 
 ## Secrets
@@ -381,6 +382,7 @@ generate_context_files() {
   # Generate CLAUDE.md, AGENTS.md, and GEMINI.md in the project directory
   # Uses marker-based approach to preserve user content
   DOMAIN=$(cat /etc/ellulai/domain 2>/dev/null || echo "YOUR-DOMAIN")
+  DEV_DOMAIN=$(cat /etc/ellulai/dev-domain 2>/dev/null || echo "dev.$DOMAIN")
 
   # Read app name from ellulai.json if it exists
   APP_NAME=""
@@ -398,7 +400,7 @@ generate_context_files() {
     # Free tier: no deploy, no push, no databases, no ship, no git-flow
     GENERATED_BLOCK="<!-- ELLULAI:START — Auto-generated rules. Do not edit between these markers. -->
 # ellul.ai Free Tier ($DOMAIN)
-Preview: https://dev.$DOMAIN (port 3000) — deployment not available on free tier.
+Preview: https://$DEV_DOMAIN (port 3000) — deployment not available on free tier.
 
 ## RULES (ALWAYS FOLLOW)
 1. **WORKSPACE BOUNDARY**: All work MUST stay inside this directory ($TARGET_DIR). NEVER create new directories under ~/projects/. NEVER modify files in other projects.
@@ -467,7 +469,7 @@ NEVER run ellulai-expose again for this project.
     # Paid tier: full content
     GENERATED_BLOCK="<!-- ELLULAI:START — Auto-generated rules. Do not edit between these markers. -->
 # ellul.ai ($DOMAIN)
-Preview: https://dev.$DOMAIN (port 3000) | Production: https://APPNAME-$DOMAIN
+Preview: https://$DEV_DOMAIN (port 3000) | Production: https://APPNAME-$DOMAIN
 
 ## RULES (ALWAYS FOLLOW)
 1. **WORKSPACE BOUNDARY**: All work MUST stay inside this directory ($TARGET_DIR). NEVER create new directories under ~/projects/. NEVER modify files in other projects.
